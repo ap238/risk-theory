@@ -1,0 +1,67 @@
+import numpy as np
+
+class GeneticHMM:
+    def __init__(self, states, observations, pi, A, B):
+        self.states = states
+        self.obs_symbols = observations
+        self.pi = pi
+        self.A = A
+        self.B = B
+        self.state_dict = {state: idx for idx, state in enumerate(states)}
+        self.obs_dict = {symbol: idx for idx, symbol in enumerate(observations)}
+        self.N = len(states)
+        self.M = len(observations)
+
+    def viterbi(self, obs_seq):
+        T = len(obs_seq)
+        obs_idx = [self.obs_dict[o] for o in obs_seq]
+
+        delta = np.zeros((T, self.N))
+        psi = np.zeros((T, self.N), dtype=int)
+        delta[0] = self.pi * self.B[:, obs_idx[0]]
+
+        for t in range(1, T):
+            for j in range(self.N):
+                seq_probs = delta[t-1] * self.A[:, j]
+                psi[t, j] = np.argmax(seq_probs)
+                delta[t, j] = np.max(seq_probs) * self.B[j, obs_idx[t]]
+
+        states_sequence = np.zeros(T, dtype=int)
+        states_sequence[-1] = np.argmax(delta[-1])
+
+        for t in reversed(range(1, T)):
+            states_sequence[t-1] = psi[t, states_sequence[t]]
+
+        inferred_states = [self.states[state_idx] for state_idx in states_sequence]
+
+        return inferred_states
+
+if __name__ == "__main__":
+    # Define states and observations
+    states = ["Normal", "Mutated"]
+    observations = ["A", "T", "C", "G"]
+
+    # Initial probabilities (Normal, Mutated)
+    pi = np.array([0.95, 0.05])
+
+    # Transition matrix: Normal ↔ Mutated
+    A = np.array([
+        [0.98, 0.02],  # Normal → Normal/Mutated
+        [0.10, 0.90],  # Mutated → Normal/Mutated
+    ])
+
+    # Emission probabilities: nucleotides under Normal and Mutated states
+    B = np.array([
+        [0.30, 0.30, 0.20, 0.20],  # Normal: probabilities A, T, C, G
+        [0.10, 0.10, 0.40, 0.40],  # Mutated: probabilities A, T, C, G
+    ])
+
+    # Observed sequence (DNA fragment)
+    obs_seq = ["A", "T", "G", "G", "C", "C", "A", "T", "C", "G"]
+
+    model = GeneticHMM(states, observations, pi, A, B)
+    inferred_states = model.viterbi(obs_seq)
+
+    print("Observation:", obs_seq)
+    print("Inferred States:", inferred_states)
+    
